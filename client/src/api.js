@@ -1,4 +1,4 @@
-const BASE = "http://localhost:3001/api";
+const BASE = `http://${window.location.hostname}:3001/api`;
 
 async function request(path, options = {}) {
   const res = await fetch(`${BASE}${path}`, {
@@ -29,4 +29,9 @@ export const api = {
 
   getMood: (date) => request(`/moods?date=${date}`),
   saveMood: (data) => request("/moods", { method: "POST", body: JSON.stringify(data) }),
+
+  getMealPlan: (weekStart) => request(`/meal-plans?week=${weekStart}`),
+  uploadMealPlan: (data) => request("/meal-plans", { method: "POST", body: JSON.stringify(data) }),
+  checkinMeal: (entry_id) => request("/meal-plans/checkin", { method: "POST", body: JSON.stringify({ entry_id }) }),
+  getTodayPlan: (date) => request(`/meal-plans/today?date=${date}`),
 };
