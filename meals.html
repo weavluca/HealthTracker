@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Meals · HealthOS</title>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="style.css"/>
+</head>
+<body>
+  <aside class="sidebar">
+    <div class="logo"><span class="logo-mark">H</span><span class="logo-text">ealthOS</span></div>
+    <nav class="nav">
+      <a href="index.html" class="nav-item" data-page="dashboard">
+        <svg viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>Dashboard
+      </a>
+      <a href="meals.html" class="nav-item active" data-page="meals">
+        <svg viewBox="0 0 24 24"><path d="M18 8h1a4 4 0 010 8h-1"/><path d="M2 8h16v9a4 4 0 01-4 4H6a4 4 0 01-4-4V8z"/><line x1="6" y1="1" x2="6" y2="4"/><line x1="10" y1="1" x2="10" y2="4"/><line x1="14" y1="1" x2="14" y2="4"/></svg>Meals
+      </a>
+      <a href="workouts.html" class="nav-item" data-page="workouts">
+        <svg viewBox="0 0 24 24"><path d="M6 5v14M18 5v14M2 9h4M18 9h4M2 15h4M18 15h4"/></svg>Workouts
+      </a>
+      <a href="habits.html" class="nav-item" data-page="habits">
+        <svg viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>Habits & Mood
+      </a>
+    </nav>
+    <div class="sidebar-footer"><span id="today-date"></span></div>
+  </aside>
+
+  <main class="main">
+    <header class="topbar">
+      <h1 class="page-title">Meals</h1>
+      <button class="btn btn--primary" onclick="openModal('meal-modal')">+ Log Meal</button>
+    </header>
+
+    <section class="dashboard-grid">
+      <div class="card card--wide">
+        <div class="card-header"><h2>Today's Meals</h2></div>
+        <div id="meals-today"></div>
+      </div>
+      <div class="card card--wide">
+        <div class="card-header">
+          <h2>Meal History</h2>
+          <input type="date" id="history-date" class="date-filter"/>
+        </div>
+        <div id="meals-history"></div>
+      </div>
+    </section>
+  </main>
+
+  <!-- Log Meal Modal -->
+  <div class="modal-overlay" id="meal-modal">
+    <div class="modal">
+      <div class="modal-header">
+        <h3>Log a Meal</h3>
+        <button class="modal-close" onclick="closeModal('meal-modal')">✕</button>
+      </div>
+      <div class="modal-body">
+        <label>Meal Name<input type="text" id="meal-name" placeholder="e.g. Grilled chicken & rice"/></label>
+        <label>Meal Type
+          <select id="meal-type">
+            <option value="Breakfast">Breakfast</option>
+            <option value="Lunch">Lunch</option>
+            <option value="Dinner">Dinner</option>
+            <option value="Snack">Snack</option>
+          </select>
+        </label>
+        <label>Calories (optional)<input type="number" id="meal-calories" placeholder="e.g. 450"/></label>
+        <label>Protein g (optional)<input type="number" id="meal-protein" placeholder="e.g. 35"/></label>
+        <label>Notes<textarea id="meal-notes" placeholder="Ingredients, how you felt, etc."></textarea></label>
+        <label>Time<input type="time" id="meal-time"/></label>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn--ghost" onclick="closeModal('meal-modal')">Cancel</button>
+        <button class="btn btn--primary" onclick="logMeal()">Save Meal</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+  <script>
+    document.getElementById('today-date').textContent = new Date().toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+    document.getElementById('meal-time').value = new Date().toTimeString().slice(0,5);
+
+    function logMeal() {
+      const name = document.getElementById('meal-name').value.trim();
+      if (!name) return alert('Please enter a meal name.');
+      const meals = JSON.parse(localStorage.getItem('meals') || '[]');
+      meals.push({
+        id: Date.now(),
+        name,
+        type: document.getElementById('meal-type').value,
+        calories: document.getElementById('meal-calories').value,
+        protein: document.getElementById('meal-protein').value,
+        notes: document.getElementById('meal-notes').value,
+        time: document.getElementById('meal-time').value,
+        date: new Date().toISOString().split('T')[0]
+      });
+      localStorage.setItem('meals', JSON.stringify(meals));
+      closeModal('meal-modal');
+      document.getElementById('meal-name').value = '';
+      document.getElementById('meal-calories').value = '';
+      document.getElementById('meal-protein').value = '';
+      document.getElementById('meal-notes').value = '';
+      renderMeals();
+    }
+
+    function renderMeals() {
+      const meals = JSON.parse(localStorage.getItem('meals') || '[]');
+      const todayKey = new Date().toISOString().split('T')[0];
+      const todayMeals = meals.filter(m => m.date === todayKey);
+
+      const todayEl = document.getElementById('meals-today');
+      todayEl.innerHTML = todayMeals.length
+        ? todayMeals.map(m => mealCard(m)).join('')
+        : '<p class="empty-state">No meals logged today. Hit "+ Log Meal" to start.</p>';
+
+      renderHistory();
+    }
+
+    function renderHistory() {
+      const filterDate = document.getElementById('history-date').value;
+      const meals = JSON.parse(localStorage.getItem('meals') || '[]');
+      const filtered = filterDate ? meals.filter(m => m.date === filterDate) : meals.slice().reverse().slice(0, 20);
+      const histEl = document.getElementById('meals-history');
+      histEl.innerHTML = filtered.length
+        ? filtered.map(m => mealCard(m, true)).join('')
+        : '<p class="empty-state">No meals found.</p>';
+    }
+
+    function mealCard(m, showDate = false) {
+      return `<div class="list-item">
+        <div class="list-item-meta">
+          <span class="tag tag--meal">${m.type}</span>
+          ${showDate ? `<span class="list-item-date">${m.date}</span>` : ''}
+          <span class="list-item-time">${m.time || ''}</span>
+        </div>
+        <div class="list-item-main">
+          <strong>${m.name}</strong>
+          ${m.calories ? `<span class="macro">${m.calories} kcal</span>` : ''}
+          ${m.protein ? `<span class="macro">${m.protein}g protein</span>` : ''}
+        </div>
+        ${m.notes ? `<div class="list-item-notes">${m.notes}</div>` : ''}
+        <button class="btn-delete" onclick="deleteMeal(${m.id})">✕</button>
+      </div>`;
+    }
+
+    function deleteMeal(id) {
+      if (!confirm('Delete this meal?')) return;
+      let meals = JSON.parse(localStorage.getItem('meals') || '[]');
+      meals = meals.filter(m => m.id !== id);
+      localStorage.setItem('meals', JSON.stringify(meals));
+      renderMeals();
+    }
+
+    document.getElementById('history-date').addEventListener('change', renderHistory);
+    renderMeals();
+  </script>
+</body>
+</html>

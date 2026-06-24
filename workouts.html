@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Workouts · HealthOS</title>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="style.css"/>
+</head>
+<body>
+  <aside class="sidebar">
+    <div class="logo"><span class="logo-mark">H</span><span class="logo-text">ealthOS</span></div>
+    <nav class="nav">
+      <a href="index.html" class="nav-item">
+        <svg viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>Dashboard
+      </a>
+      <a href="meals.html" class="nav-item">
+        <svg viewBox="0 0 24 24"><path d="M18 8h1a4 4 0 010 8h-1"/><path d="M2 8h16v9a4 4 0 01-4 4H6a4 4 0 01-4-4V8z"/><line x1="6" y1="1" x2="6" y2="4"/><line x1="10" y1="1" x2="10" y2="4"/><line x1="14" y1="1" x2="14" y2="4"/></svg>Meals
+      </a>
+      <a href="workouts.html" class="nav-item active">
+        <svg viewBox="0 0 24 24"><path d="M6 5v14M18 5v14M2 9h4M18 9h4M2 15h4M18 15h4"/></svg>Workouts
+      </a>
+      <a href="habits.html" class="nav-item">
+        <svg viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>Habits & Mood
+      </a>
+    </nav>
+    <div class="sidebar-footer"><span id="today-date"></span></div>
+  </aside>
+
+  <main class="main">
+    <header class="topbar">
+      <h1 class="page-title">Workouts</h1>
+      <button class="btn btn--primary" onclick="openModal('workout-modal')">+ Log Workout</button>
+    </header>
+
+    <section class="dashboard-grid">
+      <div class="card card--wide">
+        <div class="card-header"><h2>Today's Workouts</h2></div>
+        <div id="workouts-today"></div>
+      </div>
+      <div class="card card--wide">
+        <div class="card-header">
+          <h2>Workout History</h2>
+          <input type="date" id="history-date" class="date-filter"/>
+        </div>
+        <div id="workouts-history"></div>
+      </div>
+    </section>
+  </main>
+
+  <!-- Log Workout Modal -->
+  <div class="modal-overlay" id="workout-modal">
+    <div class="modal">
+      <div class="modal-header">
+        <h3>Log a Workout</h3>
+        <button class="modal-close" onclick="closeModal('workout-modal')">✕</button>
+      </div>
+      <div class="modal-body">
+        <label>Workout Name<input type="text" id="workout-name" placeholder="e.g. Upper Body — Push Day"/></label>
+        <label>Type
+          <select id="workout-type">
+            <option value="Strength">Strength</option>
+            <option value="Cardio">Cardio</option>
+            <option value="Flexibility">Flexibility</option>
+            <option value="HIIT">HIIT</option>
+            <option value="Other">Other</option>
+          </select>
+        </label>
+        <label>Duration (minutes)<input type="number" id="workout-duration" placeholder="e.g. 45"/></label>
+        <label>Exercises / Notes<textarea id="workout-notes" placeholder="e.g. Bench 3x10, Rows 3x12..."></textarea></label>
+        <label>How did it feel?
+          <select id="workout-feel">
+            <option value="">—</option>
+            <option value="Easy">Easy</option>
+            <option value="Good">Good</option>
+            <option value="Hard">Hard</option>
+            <option value="Exhausting">Exhausting</option>
+          </select>
+        </label>
+        <label>Time<input type="time" id="workout-time"/></label>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn--ghost" onclick="closeModal('workout-modal')">Cancel</button>
+        <button class="btn btn--primary" onclick="logWorkout()">Save Workout</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+  <script>
+    document.getElementById('today-date').textContent = new Date().toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+    document.getElementById('workout-time').value = new Date().toTimeString().slice(0,5);
+
+    function logWorkout() {
+      const name = document.getElementById('workout-name').value.trim();
+      if (!name) return alert('Please enter a workout name.');
+      const workouts = JSON.parse(localStorage.getItem('workouts') || '[]');
+      workouts.push({
+        id: Date.now(),
+        name,
+        type: document.getElementById('workout-type').value,
+        duration: document.getElementById('workout-duration').value,
+        notes: document.getElementById('workout-notes').value,
+        feel: document.getElementById('workout-feel').value,
+        time: document.getElementById('workout-time').value,
+        date: new Date().toISOString().split('T')[0]
+      });
+      localStorage.setItem('workouts', JSON.stringify(workouts));
+      closeModal('workout-modal');
+      document.getElementById('workout-name').value = '';
+      document.getElementById('workout-duration').value = '';
+      document.getElementById('workout-notes').value = '';
+      renderWorkouts();
+    }
+
+    function renderWorkouts() {
+      const workouts = JSON.parse(localStorage.getItem('workouts') || '[]');
+      const todayKey = new Date().toISOString().split('T')[0];
+      const todayWorkouts = workouts.filter(w => w.date === todayKey);
+
+      document.getElementById('workouts-today').innerHTML = todayWorkouts.length
+        ? todayWorkouts.map(w => workoutCard(w)).join('')
+        : '<p class="empty-state">No workouts logged today. Let\'s move! 💪</p>';
+
+      renderHistory();
+    }
+
+    function renderHistory() {
+      const filterDate = document.getElementById('history-date').value;
+      const workouts = JSON.parse(localStorage.getItem('workouts') || '[]');
+      const filtered = filterDate ? workouts.filter(w => w.date === filterDate) : workouts.slice().reverse().slice(0, 20);
+      document.getElementById('workouts-history').innerHTML = filtered.length
+        ? filtered.map(w => workoutCard(w, true)).join('')
+        : '<p class="empty-state">No workouts found.</p>';
+    }
+
+    function workoutCard(w, showDate = false) {
+      const feelColors = { Easy: '#a3cfbb', Good: '#86c5a0', Hard: '#f0c27f', Exhausting: '#e8a598' };
+      return `<div class="list-item">
+        <div class="list-item-meta">
+          <span class="tag tag--workout">${w.type}</span>
+          ${w.feel ? `<span class="tag" style="background:${feelColors[w.feel] || '#eee'}">${w.feel}</span>` : ''}
+          ${showDate ? `<span class="list-item-date">${w.date}</span>` : ''}
+          <span class="list-item-time">${w.time || ''}</span>
+        </div>
+        <div class="list-item-main">
+          <strong>${w.name}</strong>
+          ${w.duration ? `<span class="macro">${w.duration} min</span>` : ''}
+        </div>
+        ${w.notes ? `<div class="list-item-notes">${w.notes}</div>` : ''}
+        <button class="btn-delete" onclick="deleteWorkout(${w.id})">✕</button>
+      </div>`;
+    }
+
+    function deleteWorkout(id) {
+      if (!confirm('Delete this workout?')) return;
+      let workouts = JSON.parse(localStorage.getItem('workouts') || '[]');
+      workouts = workouts.filter(w => w.id !== id);
+      localStorage.setItem('workouts', JSON.stringify(workouts));
+      renderWorkouts();
+    }
+
+    document.getElementById('history-date').addEventListener('change', renderHistory);
+    renderWorkouts();
+  </script>
+</body>
+</html>
