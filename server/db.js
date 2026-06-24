@@ -52,6 +52,35 @@ db.exec(`
     date TEXT NOT NULL UNIQUE,
     time TEXT
   );
+
+  CREATE TABLE IF NOT EXISTS meal_plans (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    week_start TEXT NOT NULL,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    notes TEXT
+  );
+
+  CREATE TABLE IF NOT EXISTS meal_plan_entries (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    plan_id INTEGER NOT NULL REFERENCES meal_plans(id) ON DELETE CASCADE,
+    date TEXT NOT NULL,
+    day_name TEXT NOT NULL,
+    day_type TEXT NOT NULL,
+    meal_name TEXT NOT NULL,
+    items TEXT NOT NULL,
+    kcal INTEGER,
+    protein INTEGER,
+    carbs INTEGER,
+    fat INTEGER,
+    notes TEXT
+  );
+
+  CREATE TABLE IF NOT EXISTS meal_checkins (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    entry_id INTEGER NOT NULL REFERENCES meal_plan_entries(id) ON DELETE CASCADE,
+    checked_at TEXT NOT NULL,
+    UNIQUE(entry_id)
+  );
 `);
 
 export default db;

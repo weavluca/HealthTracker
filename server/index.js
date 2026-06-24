@@ -121,6 +121,101 @@ app.post("/api/moods", (req, res) => {
   res.json({ ok: true });
 });
 
+// ── Meal Plans ──
+
+app.get("/api/meal-plans", (req, res) => {
+  const { week } = req.query;
+  if (week) {
+    const plan = db.prepare("SELECT * FROM meal_plans WHERE week_start = ?").get(week);
+    if (!plan) return res.json(null);
+    const entries = db.prepare("SELECT * FROM meal_plan_entries WHERE plan_id = ? ORDER BY date, id").all(plan.id);
+    const checkins = db.prepare(
+      "SELECT mc.* FROM meal_checkins mc JOIN meal_plan_entries mpe ON mc.entry_id = mpe.id WHERE mpe.plan_id = ?"
+    ).all(plan.id);
+    const checkedEntryIds = new Set(checkins.map((c) => c.entry_id));
+    const enriched = entries.map((e) => ({ ...e, items: JSON.parse(e.items), checked: checkedEntryIds.has(e.id) }));
+    return res.json({ ...plan, entries: enriched });
+  }
+  res.json(db.prepare("SELECT * FROM meal_plans ORDER BY week_start DESC LIMIT 20").all());
+});
+
+app.post("/api/meal-plans", (req, res) => {
+  const { week_start, days } = req.body;
+  if (!week_start || !days || !Array.isArray(days)) return res.status(400).json({ error: "week_start and days[] are required" });
+
+  const insertPlan = db.prepare("INSERT INTO meal_plans (week_start) VALUES (?)");
+  const insertEntry = db.prepare(
+    "INSERT INTO meal_plan_entries (plan_id, date, day_name, day_type, meal_name, items, kcal, protein, carbs, fat, notes) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+  );
+
+  const existing = db.prepare("SELECT id FROM meal_plans WHERE week_start = ?").get(week_start);
+  if (existing) {
+    db.prepare("DELETE FROM meal_plans WHERE id = ?").run(existing.id);
+  }
+
+  const txn = db.transaction(() => {
+    const planId = insertPlan.run(week_start).lastInsertRowid;
+    const startDate = new Date(week_start + "T12:00:00");
+    for (let i = 0; i < days.length; i++) {
+      const day = days[i];
+      const date = new Date(startDate);
+      date.setDate(startDate.getDate() + i);
+      const dateStr = date.toISOString().split("T")[0];
+      for (const meal of day.meals) {
+        insertEntry.run(
+          planId, dateStr, day.day, day.type, meal.name,
+          JSON.stringify(meal.items),
+          meal.macros?.kcal || null, meal.macros?.protein || null,
+          meal.macros?.carbs || null, meal.macros?.fat || null,
+          meal.notes || null
+        );
+      }
+    }
+    return planId;
+  });
+
+  const planId = txn();
+  res.status(201).json({ id: planId });
+});
+
+app.post("/api/meal-plans/checkin", (req, res) => {
+  const { entry_id } = req.body;
+  if (!entry_id) return res.status(400).json({ error: "entry_id is required" });
+
+  const existing = db.prepare("SELECT id FROM meal_checkins WHERE entry_id = ?").get(entry_id);
+  if (existing) {
+    db.prepare("DELETE FROM meal_checkins WHERE entry_id = ?").run(entry_id);
+    return res.json({ checked: false });
+  }
+
+  const now = new Date().toISOString();
+  db.prepare("INSERT INTO meal_checkins (entry_id, checked_at) VALUES (?, ?)").run(entry_id, now);
+
+  const entry = db.prepare("SELECT * FROM meal_plan_entries WHERE id = ?").get(entry_id);
+  if (entry) {
+    const time = new Date().toTimeString().slice(0, 5);
+    db.prepare(
+      "INSERT INTO meals (name, type, calories, protein, notes, time, date) VALUES (?, ?, ?, ?, ?, ?, ?)"
+    ).run(entry.meal_name, "Planned", entry.kcal, entry.protein, entry.notes, time, entry.date);
+  }
+
+  res.json({ checked: true });
+});
+
+app.get("/api/meal-plans/today", (req, res) => {
+  const { date } = req.query;
+  if (!date) return res.status(400).json({ error: "date is required" });
+  const entries = db.prepare(
+    "SELECT mpe.*, mp.week_start FROM meal_plan_entries mpe JOIN meal_plans mp ON mpe.plan_id = mp.id WHERE mpe.date = ? ORDER BY mpe.id"
+  ).all(date);
+  const checkins = db.prepare(
+    "SELECT mc.* FROM meal_checkins mc JOIN meal_plan_entries mpe ON mc.entry_id = mpe.id WHERE mpe.date = ?"
+  ).all(date);
+  const checkedEntryIds = new Set(checkins.map((c) => c.entry_id));
+  const enriched = entries.map((e) => ({ ...e, items: JSON.parse(e.items), checked: checkedEntryIds.has(e.id) }));
+  res.json(enriched);
+});
+
 // ── Dashboard aggregation ──
 
 app.get("/api/dashboard", (req, res) => {
